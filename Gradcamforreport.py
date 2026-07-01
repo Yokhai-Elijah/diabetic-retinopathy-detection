@@ -325,7 +325,7 @@ def main():
     print("\nFiles for your report:")
     for key, info in summary.items():
         print(f"  {key}: {info['saved_as']}")
-    print(f"  Combined: Figure3_GradCAM_combined.png  ← use this in report")
+    print(f"  Combined: Figure3_GradCAM_combined.png")
 
 if __name__ == "__main__":
     main()
