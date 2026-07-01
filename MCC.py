@@ -60,7 +60,7 @@ def load_dataset(data_dir):
     if not found:
         raise FileNotFoundError(
             f"No recognised folders in '{data_dir}'. "
-            f"Expected: No_DR/DR or 'Normal (N)'/'Diabetes (D)'"
+            f"your file'"
         )
     return paths, labels
 
