@@ -18,7 +18,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 import matplotlib.pyplot as plt
 import os
 # Change to your project directory
-os.chdir(r"C:\Users\yokha\Desktop\Personal project")
+os.chdir(r"")
 #This script tests multiple AI's and creates gradcam results
 # ---- Utility: simple fundus crop ----
 def crop_circle_image(img):
@@ -62,11 +62,11 @@ valid_transforms = A.Compose([
 ])
 
 # ---- Load metadata ----
-meta = pd.read_csv(r"C:\Users\yokha\Desktop\Personal project\metadata.csv")
+meta = pd.read_csv(r"your meta.csv")
 train_df, valid_df = train_test_split(meta, test_size=0.2, stratify=meta['label'], random_state=42)
 
 # ---- Setup ----
-data_dir = r"C:\Users\yokha\Desktop\Personal project\Normal and diabetes"
+data_dir = r"your dataset"
 valid_ds = FundusDataset(valid_df, img_dir=data_dir, transforms=valid_transforms)
 valid_loader = DataLoader(valid_ds, batch_size=16, shuffle=False, num_workers=0)
 
