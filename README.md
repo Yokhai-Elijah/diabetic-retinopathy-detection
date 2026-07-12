@@ -1,204 +1,46 @@
-# Diabetic Retinopathy Detection using EfficientNet-B2
+## 🗃️ Dataset Information
 
-[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Live%20Demo-blue)](https://huggingface.co/spaces/RickSorkin/diabetic-retinopathy-detection)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-green)](https://python.org)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-orange)](https://pytorch.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+| | Training Dataset | External Validation Dataset |
+|---|---|---|
+| **Name** | Retinal Fundus Images (Nithish, 2024) | Diabetic Retinopathy 224×224 (2019 Data) (Rath, 2020) |
+| **Source** | [Kaggle](https://www.kaggle.com/datasets/kssanjaynithish03/retinal-fundus-images) | [Kaggle](https://www.kaggle.com/datasets/sovitrath/diabetic-retinopathy-224x224-2019-data) |
+| **Size** | 4,482 images | 3,662 images |
+| **Classes** | Normal (2,874), Diabetes (1,608) | Normal (1,805), Diabetic (1,857) — merged from 5 original severity classes (No_DR / Mild / Moderate / Severe / Proliferative_DR) into binary labels |
+| **Format** | JPG fundus photographs, resized to 512×512 for training | JPG fundus photographs, originally 224×224, upsampled to 512×512 for inference |
+| **Role** | Model development, 5-fold stratified cross-validation | Held out entirely — never used in training, tuning, or threshold selection |
 
-Automated detection of diabetic retinopathy from retinal fundus photographs using **EfficientNet-B2** with transfer learning, 5-fold cross-validation, and Grad-CAM interpretability.
-
----
-
-## 🔬 Live Demo
-
-Try the model instantly — no setup required:
-
-👉 **[huggingface.co/spaces/RickSorkin/diabetic-retinopathy-detection](https://huggingface.co/spaces/RickSorkin/diabetic-retinopathy-detection)**
-
-Upload a retinal fundus image and get:
-- Binary prediction (Normal / Diabetic Retinopathy)
-- Confidence score
-- Grad-CAM heatmap showing which retinal regions influenced the decision
+Neither dataset is redistributed in this repository. Download both from the Kaggle links above and
+use `organize_binary.py` to convert them into the binary folder structure expected by the training
+and evaluation scripts. Both datasets are third-party Kaggle datasets — check each dataset's Kaggle
+page for its specific usage license before redistribution.
 
 ---
 
-## 📊 Key Results
+## 🧪 Methodology
 
-| Metric | Without TTA | With TTA |
-|--------|------------|----------|
-| ROC-AUC | 98.11% | 98.46% |
-| Accuracy | 95.93% | 96.12% |
-| Sensitivity | 94.13% | 94.40% |
-| Specificity | 97.78% | 97.89% |
-| F1 Score | 95.94% | 96.08% |
-| MCC | 0.9193 | 0.9231 |
+1. **Preprocessing** — fundus region cropping (largest-contour detection) to remove black borders, resize to 512×512, ImageNet normalization.
+2. **Training** — EfficientNet-B2 (ImageNet-pretrained) fine-tuned end-to-end via 5-fold stratified cross-validation, using AdamW, weighted cross-entropy (1.15× multiplier on the diabetic class to offset class imbalance), and Albumentations-based augmentation (flips, rotation, color/contrast jitter, blur, noise, coarse dropout, CLAHE).
+3. **Model selection** — for each fold, the checkpoint with the best validation AUC is kept; the fold with the strongest internal validation AUC (fold 2) is selected as the primary model.
+4. **Statistical validation** — 95% confidence intervals via bootstrap resampling (1,000 iterations) for every reported metric; Expected Calibration Error (ECE) to assess probability calibration.
+5. **Robustness check** — test-time augmentation (6 geometric views, softmax-averaged) evaluated for improvement across all metrics.
+6. **External validation** — full evaluation on an independent, separately-sourced dataset that was never touched during development, to test true generalization.
+7. **Interpretability** — Grad-CAM heatmaps generated on the external validation set to verify the model attends to clinically relevant retinal features (microaneurysms, hemorrhages, exudates).
 
-*Evaluated on 3,662 independent external validation images (Rath, 2020). All folds mean accuracy: 94.08% ± 0.98%.*
-
----
-
-## 🗂️ Repository Structure
-
-```
-diabetic-retinopathy-detection/
-│
-├── app.py                        # Hugging Face Spaces Gradio demo
-├── requirements.txt              # Python dependencies
-│
-├── organize_binary.py            # Convert 5-class DR dataset → binary (No_DR / DR)
-├── compare_models.py             # Evaluate and rank all .pth models on a dataset
-├── statistical_analysis.py       # Bootstrap CIs, ROC-AUC, PR-AUC, calibration curves
-├── test_time_augmentation.py     # TTA evaluation with MCC bootstrap CI
-├── calculate_mcc.py              # Standalone MCC + bootstrap CI calculator
-├── gradcam_paper_figures.py      # Generate publication-quality Grad-CAM figures
-└── README.md
-```
-
-> **Note:** The trained model weights (`fold_2_best.pth` and all fold models) are not included due to GitHub file size limits. The model is loaded automatically in the Hugging Face demo. To train from scratch, follow the Training section below.
+Full detail on each step is in the accompanying manuscript (submitted to PeerJ Computer Science,
+ID CS-2026:07:143944).
 
 ---
 
-## 🚀 Quick Start
+## 📜 License & Contributing
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/Yokhai-Elijah/diabetic-retinopathy-detection.git
-cd diabetic-retinopathy-detection
-```
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for full
+terms. In short: you're free to use, modify, and redistribute this code, including for commercial
+purposes, as long as the original copyright notice is retained.
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Prepare your dataset
-
-**Training dataset:** [Retinal Fundus Images (Nithish, 2024)](https://www.kaggle.com/datasets/kssanjaynithish03/retinal-fundus-images)
-```
-Normal and diabetes/
-├── Normal (N)/
-└── Diabetes (D)/
-```
-
-**External validation dataset:** [Diabetic Retinopathy 224×224 (Rath, 2020)](https://www.kaggle.com/datasets/sovitrath/diabetic-retinopathy-224x224-2019-data)
-
-Convert to binary format:
-```bash
-python organize_binary.py
-```
-This creates `binary_dataset/No_DR/` and `binary_dataset/DR/`.
-
----
-
-## 🔧 Scripts
-
-### Evaluate all models
-Compare every `.pth` file in your directory against a dataset:
-```bash
-python compare_models.py --image_dir binary_dataset
-```
-
-### Statistical analysis (AUC, CI, calibration)
-```bash
-python statistical_analysis.py \
-  --model_path training_output_kfold/fold_2_best.pth \
-  --data_dir binary_dataset \
-  --output_dir statistical_results
-```
-
-### Test-Time Augmentation + MCC
-```bash
-python test_time_augmentation.py \
-  --model_path training_output_kfold/fold_2_best.pth \
-  --data_dir binary_dataset \
-  --output_dir tta_results
-```
-
-### MCC with bootstrap CI
-```bash
-python calculate_mcc.py \
-  --model_path training_output_kfold/fold_2_best.pth \
-  --data_dir binary_dataset \
-  --threshold 0.5409
-```
-
-### Grad-CAM publication figures
-```bash
-python gradcam_paper_figures.py \
-  --model_path training_output_kfold/fold_2_best.pth \
-  --image_dir binary_dataset \
-  --output_dir gradcam_paper \
-  --threshold 0.5409
-```
-
----
-
-## 🏋️ Model Details
-
-| Parameter | Value |
-|-----------|-------|
-| Architecture | EfficientNet-B2 (timm) |
-| Training images | 4,482 fundus images |
-| Cross-validation | 5-fold stratified |
-| Optimizer | AdamW (lr=5×10⁻⁵, wd=1×10⁻⁴) |
-| Loss function | Weighted cross-entropy (1.15× diabetic) |
-| Batch size | 6 |
-| Max epochs | 30 (early stopping, patience=7) |
-| Image size | 512×512 |
-| Mixed precision | Yes (torch.cuda.amp) |
-| Classification threshold | 0.5409 (Youden's Index) |
-
----
-
-## 📦 Dependencies
-
-```
-torch>=2.0.0
-torchvision>=0.15.0
-timm>=0.9.0
-albumentations
-opencv-python
-Pillow
-scikit-learn
-matplotlib
-seaborn
-gradio>=4.0.0
-numpy
-pandas
-tqdm
-```
-
-Install all with:
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## 📄 Citation
-
-If you use this work, please cite:
-
-```
-@article{elijah2024diabetic,
-  title={Automated Diabetic Retinopathy Detection Using EfficientNet-B2 
-         with Transfer Learning: A Comprehensive Statistical Validation Study},
-  author={Elijah, Yokhai},
-  year={2024}
-}
-```
-
----
-
-## 📚 References
-
-- Nithish, K.S.S. (2024). *Retinal Fundus Images* [Dataset]. Kaggle.
-- Rath, S. (2020). *Diabetic Retinopathy 224×224 (2019 Data)* [Dataset]. Kaggle.
-- Tan, M. & Le, Q. (2019). EfficientNet: Rethinking model scaling for CNNs. ICML.
-- Selvaraju, R.R. et al. (2017). Grad-CAM. ICCV.
-
----
-
-## ⚕️ Disclaimer
-
-This project is for **research purposes only** and is not a medical device. It should not be used as a substitute for professional ophthalmological examination. Do not upload real patient images containing identifiable health information.
+**Contributions are welcome.** If you'd like to report a bug, suggest an improvement, or extend
+this work:
+1. Open a [GitHub Issue](../../issues) describing the change or problem.
+2. For code changes, fork the repository, make your changes on a new branch, and open a Pull
+   Request referencing the issue.
+3. For questions about the research itself (methodology, results, the accompanying manuscript),
+   feel free to reach out directly — see the manuscript for contact details.
